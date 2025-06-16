@@ -22,6 +22,16 @@ regress_stat <- function(stat_name, value, n)
   df
   
 }
+
+logit <- function(x)
+{
+  log(x/ ( 1-x))
+}
+
+sigmoid <- function(x)
+{
+  exp(x) / (1+exp(x))
+}
   
 
 regressed_stats <- 
@@ -29,7 +39,9 @@ regressed_stats <-
   group_by(team, Season) %>% 
   summarise(across(all_of(reg_components$stat), 
                    ~regress_stat(cur_column(), 
-                                 weighted.mean(., game_total_points), sum(game_total_points))))
+                                 weighted.mean(., game_total_points), sum(game_total_points)))) %>% 
+  mutate_at(vars(contains("hit_pct")),atanh) %>% 
+  mutate_at(vars(all_of(setdiff(reg_components$stat, "hit_pct"))), logit)
 # Identify which columns are data frames
 is_df_col <- sapply(regressed_stats, function(x) is.data.frame(x))
 regressed_stats <- regressed_stats %>%
@@ -83,6 +95,9 @@ calc_wp <- function(currteam, opponent, year, home_away)
   ## use the model to predict each team
   predicted.set <- predict(pred_model, newdata = data)
   names(predicted.set) <- data$team
+  
+  ## translate back to a decimal
+  predicted.set <- sigmoid(predicted.set)
   
   ## now calculate the probability of a point
   p.point <- predicted.set[currteam]/(predicted.set[currteam] + predicted.set[opponent])
